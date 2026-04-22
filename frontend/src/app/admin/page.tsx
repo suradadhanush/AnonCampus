@@ -75,7 +75,6 @@ export default function AdminDashboardPage() {
     queryKey: ['admin-clusters', statusFilter, escalatedOnly, page],
     queryFn: () => adminApi.listClusters({
       page,
-      page_size: 20,
       status_filter: statusFilter || undefined,
       escalated_only: escalatedOnly,
     }).then(r => r.data),
