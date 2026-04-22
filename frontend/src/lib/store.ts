@@ -7,6 +7,7 @@ export interface AuthUser {
   role: 'student' | 'admin' | 'super_admin'
   department?: string
   year_of_study?: number
+  academic_year?: number
   trust_score: number
   institution_id: number
   is_verified: boolean
