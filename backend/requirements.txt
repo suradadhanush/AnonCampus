@@ -24,8 +24,8 @@ redis==5.0.4
 
 # NLP / ML
 sentence-transformers==3.0.0
-scikit-learn==1.4.2
-numpy==1.26.4
+scikit-learn==1.7.0
+numpy==2.3.0
 
 # HTTP client
 httpx==0.27.0
