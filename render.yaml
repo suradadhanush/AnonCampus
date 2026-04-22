@@ -1,0 +1,49 @@
+services:
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────────────
+  - type: web
+    name: anoncampus-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SYNC_DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "15"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+
+  # ── Celery Worker (handles score recomputation triggered by user actions) ────
+  - type: worker
+    name: anoncampus-celery-worker
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.tasks.celery_app worker --loglevel=warning --concurrency=2
+    envVars:
+      - fromGroup: anoncampus-env
+
+  # ── Daily Cron Job (replaces Celery Beat — no broker needed) ─────────────────
+  # Runs the standalone script directly. No Celery, no Redis, just SQLAlchemy.
+  - type: cron
+    name: anoncampus-daily-tasks
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    schedule: "0 2 * * *"   # Every day at 2:00 AM UTC
+    startCommand: python scripts/run_scheduled_tasks.py
+    envVars:
+      - fromGroup: anoncampus-env

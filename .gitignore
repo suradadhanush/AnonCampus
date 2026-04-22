@@ -1,0 +1,52 @@
+# ── Environment ───────────────────────────────────────────────
+.env
+.env.local
+.env.production
+*.env
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ── Node / Next.js ────────────────────────────────────────────
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Docker ───────────────────────────────────────────────────
+postgres_data/
+redis_data/
+
+# ── IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ── Alembic ───────────────────────────────────────────────────
+# Keep versions tracked, ignore only runtime files
+alembic/__pycache__/
+
+# ── Celery ───────────────────────────────────────────────────
+celerybeat-schedule
+celerybeat.pid
+
+# ── Misc ──────────────────────────────────────────────────────
+*.log
+*.sql.bak
+backup_*.sql
