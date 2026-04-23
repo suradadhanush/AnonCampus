@@ -3,16 +3,16 @@ from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
 import ssl
 
-# Strip sslmode from URL if present — asyncpg needs SSL via connect_args, not URL param
-def _clean_url(url: str) -> str:
-    import re
-    return re.sub(r'\?sslmode=\w+', '', url).rstrip('?')
 
-# Build SSL context for asyncpg
+def _clean_db_url(url: str) -> str:
+    """Remove all query parameters from asyncpg URL — SSL handled via connect_args"""
+    return url.split('?')[0]
+
+
 _ssl_ctx = ssl.create_default_context()
 
 engine = create_async_engine(
-    _clean_url(settings.DATABASE_URL),
+    _clean_db_url(settings.DATABASE_URL),
     echo=settings.ENVIRONMENT == "development",
     pool_pre_ping=True,
     pool_size=5,
