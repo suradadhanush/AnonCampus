@@ -22,10 +22,6 @@ python-multipart==0.0.9
 celery==5.3.6
 redis==5.0.4
 
-# ML — lightweight only, no PyTorch/scipy
-numpy==1.26.4
-scikit-learn==1.4.2
-
 # HTTP client
 httpx==0.27.0
 

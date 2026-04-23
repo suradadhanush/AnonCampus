@@ -1,24 +1,26 @@
 """
-Clustering service — institution-aware
-
-All cluster lookups filter by institution_id to prevent
-cross-institution contamination.
-
-Primary:  sentence-transformers all-MiniLM-L6-v2
-Fallback: TF-IDF cosine similarity (if model load fails)
-Timeout:  1.5s max inference time
+Clustering service — production safe
+NLP model and sklearn are optional. Falls back to keyword matching if unavailable.
 """
 import time
 import logging
-import numpy as np
+import re
 from typing import List, Optional, Tuple
-from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 
 from app.core.config import settings
 
 logger = logging.getLogger("anoncampus.clustering")
 
 _model = None
+_sklearn_available = False
+
+try:
+    import numpy as np
+    from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
+    _sklearn_available = True
+except ImportError:
+    logger.warning("numpy/sklearn not available — using keyword fallback")
+
 MAX_INFERENCE_SECONDS = 1.5
 
 
@@ -28,31 +30,25 @@ def get_model():
         try:
             from sentence_transformers import SentenceTransformer
             _model = SentenceTransformer("all-MiniLM-L6-v2")
-            logger.info("Sentence transformer model loaded")
+            logger.info("Sentence transformer loaded")
         except Exception as e:
-            logger.warning(f"Failed to load sentence transformer: {e}. Using TF-IDF fallback.")
+            logger.warning(f"Sentence transformer unavailable: {e}")
             _model = "fallback"
     return _model
 
 
 def get_embedding(text: str) -> Optional[List[float]]:
-    """
-    Returns embedding vector or None on failure/timeout.
-    Hard timeout: 1.5 seconds.
-    """
+    if not _sklearn_available:
+        return None
     try:
         model = get_model()
         if model == "fallback":
             return None
-
         start = time.monotonic()
         embedding = model.encode(text, normalize_embeddings=True)
         elapsed = time.monotonic() - start
-
         if elapsed > MAX_INFERENCE_SECONDS:
-            logger.warning(f"Embedding took {elapsed:.2f}s — exceeded {MAX_INFERENCE_SECONDS}s limit")
-            # Still return result since it completed, just log the warning
-
+            logger.warning(f"Embedding took {elapsed:.2f}s")
         return embedding.tolist()
     except Exception as e:
         logger.warning(f"Embedding failed: {e}")
@@ -60,7 +56,11 @@ def get_embedding(text: str) -> Optional[List[float]]:
 
 
 def cosine_score(vec_a: List[float], vec_b: List[float]) -> float:
+    if not _sklearn_available:
+        return 0.0
     try:
+        import numpy as np
+        from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
         a = np.array(vec_a, dtype=np.float32).reshape(1, -1)
         b = np.array(vec_b, dtype=np.float32).reshape(1, -1)
         return float(sk_cosine(a, b)[0][0])
@@ -69,28 +69,21 @@ def cosine_score(vec_a: List[float], vec_b: List[float]) -> float:
 
 
 def tfidf_similarity(text_a: str, text_b: str) -> float:
-    """TF-IDF fallback when embeddings unavailable"""
-    try:
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        vect = TfidfVectorizer(min_df=1, stop_words="english")
-        matrix = vect.fit_transform([text_a, text_b])
-        return float(sk_cosine(matrix[0], matrix[1])[0][0])
-    except Exception:
+    """Keyword overlap fallback — no sklearn needed"""
+    words_a = set(re.findall(r'\w+', text_a.lower()))
+    words_b = set(re.findall(r'\w+', text_b.lower()))
+    if not words_a or not words_b:
         return 0.0
+    intersection = words_a & words_b
+    union = words_a | words_b
+    return len(intersection) / len(union)  # Jaccard similarity
 
 
 def determine_cluster_action(
     issue_embedding: Optional[List[float]],
     issue_text: str,
     cluster_candidates: List[Tuple[int, Optional[List[float]], str]],
-    # (cluster_id, centroid_embedding, cluster_title)
 ) -> Tuple[str, Optional[int], float]:
-    """
-    Returns (action, cluster_id, similarity_score).
-    action: "same" | "conditional" | "new"
-
-    Candidates MUST already be filtered by institution_id before calling this.
-    """
     if not cluster_candidates:
         return "new", None, 0.0
 
@@ -98,7 +91,7 @@ def determine_cluster_action(
     best_cluster_id = None
 
     for cluster_id, c_embedding, c_title in cluster_candidates:
-        if issue_embedding and c_embedding:
+        if issue_embedding and c_embedding and _sklearn_available:
             score = cosine_score(issue_embedding, c_embedding)
         else:
             score = tfidf_similarity(issue_text, c_title)
@@ -120,12 +113,12 @@ def update_centroid(
     new_vec: Optional[List[float]],
     new_count: int,
 ) -> Optional[List[float]]:
-    """Incremental running-average centroid update"""
-    if not new_vec:
+    if not _sklearn_available or not new_vec:
         return current
     if not current:
         return new_vec
     try:
+        import numpy as np
         c = np.array(current, dtype=np.float32)
         n = np.array(new_vec, dtype=np.float32)
         updated = (c * (new_count - 1) + n) / new_count
@@ -138,7 +131,6 @@ def update_centroid(
 
 
 def classify_category(text: str) -> str:
-    """Keyword-based category classification with fallback to 'general'"""
     text_lower = text.lower()
     categories = {
         "infrastructure": ["wifi", "internet", "lab", "computer", "facility",
@@ -159,7 +151,6 @@ def classify_category(text: str) -> str:
 
 
 def estimate_severity(text: str) -> float:
-    """Heuristic severity — 0.0 to 1.0"""
     text_lower = text.lower()
     score = 0.5
     high = ["urgent", "immediate", "dangerous", "harassment", "ragging",
