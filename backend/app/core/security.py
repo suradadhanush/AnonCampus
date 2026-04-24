@@ -35,7 +35,9 @@ bearer_scheme = HTTPBearer(auto_error=True)
 
 # ── Password ──────────────────────────────────────────────────────────────────
 
-def hash_password(password: str) -> str:
+def hash_password(password: str):
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError("Password too long. Max 72 bytes.")
     return pwd_context.hash(password)
 
 
