@@ -7,7 +7,6 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Attach JWT on every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token')
@@ -16,7 +15,6 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Auto-logout on 401
 api.interceptors.response.use(
   (res) => res,
   (error) => {
@@ -29,39 +27,47 @@ api.interceptors.response.use(
   }
 )
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
 export const authApi = {
-  register: (data: { email: string; password: string; department?: string; year_of_study?: number }) =>
+  register: (data: { email: string; password: string; student_id: string; department: string; academic_year: number }) =>
     api.post('/auth/register', data),
-  login: (data: { email: string; password: string }) =>
-    api.post('/auth/login', data),
+
+  login: async (data: { email: string; password: string }) => {
+    const res = await api.post('/auth/login', data)
+    // Set token immediately so subsequent calls use it
+    if (typeof window !== 'undefined' && res.data.access_token) {
+      localStorage.setItem('access_token', res.data.access_token)
+      localStorage.setItem('refresh_token', res.data.refresh_token)
+    }
+    return res
+  },
+
   me: () => api.get('/auth/me'),
+
+  logout: (refresh_token: string) =>
+    api.post('/auth/logout', { refresh_token }),
+
+  refresh: (refresh_token: string) =>
+    api.post('/auth/refresh', { refresh_token }),
 }
 
-// ─── Issues ──────────────────────────────────────────────────────────────────
 export const issuesApi = {
-  list: (params?: { page?: number; page_size?: number; status_filter?: string; sort_by?: string }) =>
-    api.get('/issues', { params }),
-  listClusters: (params?: { page?: number; page_size?: number; feed_type?: string; status_filter?: string }) =>
-    api.get('/issues/clusters', { params }),
+  list: (params?: any) => api.get('/issues', { params }),
+  listClusters: (params?: any) => api.get('/issues/clusters', { params }),
   get: (id: number) => api.get(`/issues/${id}`),
-  create: (data: { title: string; body: string; category?: string; severity?: number }) =>
-    api.post('/issues', data),
+  create: (data: any) => api.post('/issues', data),
   support: (id: number) => api.post(`/issues/${id}/support`),
   addContext: (id: number, context_text: string) =>
     api.post(`/issues/${id}/context`, { context_text }),
-  feedback: (id: number, data: { sentiment: string; rating?: number; comment?: string }) =>
+  feedback: (id: number, data: any) =>
     api.post(`/issues/${id}/feedback`, data),
   getCluster: (id: number) => api.get(`/issues/${id}/cluster`),
 }
 
-// ─── Admin ───────────────────────────────────────────────────────────────────
 export const adminApi = {
-  listClusters: (params?: { page?: number; escalated_only?: boolean; status_filter?: string }) =>
-    api.get('/admin/issues', { params }),
+  listClusters: (params?: any) => api.get('/admin/issues', { params }),
   updateStatus: (cluster_id: number, new_status: string, reason?: string) =>
     api.post('/admin/update-status', { cluster_id, new_status, reason }),
   stats: () => api.get('/admin/stats'),
-  auditLog: (params?: { page?: number }) => api.get('/admin/audit-log', { params }),
+  auditLog: (params?: any) => api.get('/admin/audit-log', { params }),
   clusterDetail: (id: number) => api.get(`/admin/clusters/${id}`),
 }
