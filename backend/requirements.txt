@@ -32,6 +32,11 @@ slowapi==0.1.9
 # Config
 python-dotenv==1.0.1
 
+# NLP
+sentence-transformers==2.7.0
+numpy==1.26.4
+scikit-learn==1.4.2
+
 # Testing
 pytest==8.2.0
 pytest-asyncio==0.23.6
