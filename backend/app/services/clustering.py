@@ -1,7 +1,6 @@
-"""
 Clustering service — production safe
 NLP model and sklearn are optional. Falls back to keyword matching if unavailable.
-"""
+
 import time
 import logging
 import re
