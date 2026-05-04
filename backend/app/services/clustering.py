@@ -11,6 +11,7 @@ import json
 from typing import List, Optional, Tuple
 
 import httpx
+import asyncio
 from app.core.config import settings
 
 logger = logging.getLogger("anoncampus.clustering")
